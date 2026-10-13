@@ -73,7 +73,7 @@ npm run build
 - 2026-10-13 已验证 HTTPS 页面、`/api/ready`、安全登录 Cookie、注册/登录/退出、交易保存、历史汇率和账户删除；测试账户已删除
 - 当前服务通过公开 GitHub URL 创建。**推送新提交后，需在 [Web 服务控制台](https://dashboard.render.com/web/srv-db6vkojncjis73f14frg) 手动选择 Deploy latest commit**；这个连接方式不会自动部署 GitHub 更新
 
-仓库根目录的 `render.yaml` 是以后在**新 Render 工作区**使用的 Blueprint 模板：它定义了数据库连接、`/api/ready` 健康检查，以及通过 GitHub CI 后自动部署。当前线上服务是单独创建的，未与这个 Blueprint 绑定；不要在现有工作区再次创建同名资源。当前服务已能通过 `/api/ready` 检查数据库，但 Render 控制台的健康检查路径尚未设置为该接口。应用读取 HTTPS `RENDER_EXTERNAL_URL` 作为默认请求来源并启用安全 Cookie；绑定自定义域名时，请在 Web 服务环境变量中设置 `APP_ORIGIN=https://你的域名`。
+仓库根目录的 `render.yaml` 是以后在**新 Render 工作区**使用的 Blueprint 模板：它定义了数据库连接、`/api/ready` 健康检查，以及通过 GitHub CI 后自动部署。当前线上服务是单独创建的，未与这个 Blueprint 绑定；不要在现有工作区再次创建同名资源。当前服务已将 Render 健康检查路径设置为 `/api/ready`。应用读取 HTTPS `RENDER_EXTERNAL_URL` 作为默认请求来源并启用安全 Cookie；绑定自定义域名时，请在 Web 服务环境变量中设置 `APP_ORIGIN=https://你的域名`。
 
 **免费方案只适合短期演示。**Render 免费 Web 服务空闲约 15 分钟后会休眠，首次访问需要等待唤醒；本次免费 PostgreSQL 将于 **2026-11-12** 到期，到期后登录数据不可用。要长期放在简历中，请在到期前升级数据库并安排备份。
 
@@ -82,7 +82,7 @@ npm run build
 - 服务日志为结构化 JSON，包含请求 ID、路径、状态和耗时，不记录请求体、密码或交易备注
 - 在有 `pg_dump` 且获准连接数据库的环境中，设置 `DATABASE_URL` 后运行 `sh scripts/backup.sh`；备份默认保存到被 Git 忽略的 `backups/`，文件权限仅限当前用户。当前 Render 数据库的外部 IP 允许列表为空，不能直接从本机运行脚本；长期使用时需先规划数据库访问和备份方案，并演练恢复
 
-当前已上线，但 Render 控制台尚未配置 `/api/ready` 健康检查路径或额外的告警通知。长期展示前建议补上这两项。
+当前已上线，并使用 `/api/ready` 进行数据库就绪检查。额外的告警通知尚未配置；长期展示前建议在 Render 控制台中设置。
 
 ## 项目结构
 
