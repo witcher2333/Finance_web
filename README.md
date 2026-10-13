@@ -66,22 +66,23 @@ npm run build
 
 `Dockerfile` 将前端与 API 打包为同源服务，容器启动时运行版本化数据库迁移。公开部署时，请使用托管 PostgreSQL 和 HTTPS。不要把本地 `compose.yaml` 的示例密码用于生产。
 
-### 发布到 Render
+### Render 上线状态
 
-仓库根目录的 `render.yaml` 是 Render Blueprint：在新加坡区域创建一个 Docker Web 服务和 PostgreSQL 17，数据库连接由 Render 注入，Web 服务使用 `/api/ready` 作为健康检查。应用会读取 Render 提供的 HTTPS `RENDER_EXTERNAL_URL` 作为请求来源，并据此启用安全 Cookie；如果绑定自定义域名，请在 Web 服务环境变量中设置 `APP_ORIGIN=https://你的域名`。
+- 线上地址：[tango-finance-studio.onrender.com](https://tango-finance-studio.onrender.com/)；源码：[witcher2333/Finance_web](https://github.com/witcher2333/Finance_web)
+- Web 服务与 PostgreSQL 17 均位于新加坡区域，使用免费计划；`DATABASE_URL` 在 Render 环境变量中配置，没有进入仓库
+- 2026-10-13 已验证 HTTPS 页面、`/api/ready`、安全登录 Cookie、注册/登录/退出、交易保存、历史汇率和账户删除；测试账户已删除
+- 当前服务通过公开 GitHub URL 创建。**推送新提交后，需在 [Web 服务控制台](https://dashboard.render.com/web/srv-db6vkojncjis73f14frg) 手动选择 Deploy latest commit**；这个连接方式不会自动部署 GitHub 更新
 
-1. 将**本仓库根目录**推送到你自己的 GitHub 仓库。`origin_resource/`、`.env` 和数据库备份已被 Git 忽略，不要把课程项目的原仓库当作新版部署源。
-2. 在 [Render Dashboard](https://dashboard.render.com/) 选择 **New → Blueprint**，连接该 GitHub 仓库并确认 `render.yaml`。确认页面显示一个免费 Web 服务和一个免费 PostgreSQL 后再创建。
-3. 首次部署完成后，访问 Render 给出的 `https://…onrender.com` 地址，检查注册、登录、交易保存和 `/api/ready`。Blueprint 设置为 GitHub CI 检查通过后自动部署。
+仓库根目录的 `render.yaml` 是以后在**新 Render 工作区**使用的 Blueprint 模板：它定义了数据库连接、`/api/ready` 健康检查，以及通过 GitHub CI 后自动部署。当前线上服务是单独创建的，未与这个 Blueprint 绑定；不要在现有工作区再次创建同名资源。当前服务已能通过 `/api/ready` 检查数据库，但 Render 控制台的健康检查路径尚未设置为该接口。应用读取 HTTPS `RENDER_EXTERNAL_URL` 作为默认请求来源并启用安全 Cookie；绑定自定义域名时，请在 Web 服务环境变量中设置 `APP_ORIGIN=https://你的域名`。
 
-**免费方案只适合短期演示。**Render 免费 Web 服务空闲约 15 分钟后会休眠，首次访问需要等待唤醒；免费 PostgreSQL **创建 30 天后到期**，到期后登录数据不可用。要长期放在简历中，请在到期前升级数据库并安排备份。Render 免费数据库不能依赖为永久存储。当前本地仓库尚未连接 GitHub 远端，因此 `render.yaml` 已就绪，但未实际创建 Render 服务。
+**免费方案只适合短期演示。**Render 免费 Web 服务空闲约 15 分钟后会休眠，首次访问需要等待唤醒；本次免费 PostgreSQL 将于 **2026-11-12** 到期，到期后登录数据不可用。要长期放在简历中，请在到期前升级数据库并安排备份。
 
 - 存活检查：`GET /api/health`
 - 数据库就绪检查：`GET /api/ready`；部署平台可定期检查并在失败时告警
 - 服务日志为结构化 JSON，包含请求 ID、路径、状态和耗时，不记录请求体、密码或交易备注
-- 在有 `pg_dump` 且获准连接数据库的环境中，设置 `DATABASE_URL` 后运行 `sh scripts/backup.sh`；备份默认保存到被 Git 忽略的 `backups/`，文件权限仅限当前用户。Render Blueprint 的 `ipAllowList: []` 禁止从本机直接连接数据库，因此不能直接在本机运行这个脚本；长期使用时需先规划数据库访问和备份方案，并演练恢复
+- 在有 `pg_dump` 且获准连接数据库的环境中，设置 `DATABASE_URL` 后运行 `sh scripts/backup.sh`；备份默认保存到被 Git 忽略的 `backups/`，文件权限仅限当前用户。当前 Render 数据库的外部 IP 允许列表为空，不能直接从本机运行脚本；长期使用时需先规划数据库访问和备份方案，并演练恢复
 
-这里提供的是部署配置和监控接口，**尚未发布到外部平台或配置外部告警服务**。Render 会按 `/api/ready` 检查服务可用性；额外的通知规则可在 Render 控制台中配置。
+当前已上线，但 Render 控制台尚未配置 `/api/ready` 健康检查路径或额外的告警通知。长期展示前建议补上这两项。
 
 ## 项目结构
 
