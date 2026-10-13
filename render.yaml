@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: tango-finance-studio
+    runtime: docker
+    plan: free
+    region: singapore
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tango-finance-db
+          property: connectionString
+
+databases:
+  - name: tango-finance-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "17"
+    databaseName: tango_finance
+    ipAllowList: []
