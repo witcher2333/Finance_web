@@ -33,7 +33,7 @@ export async function verifyPassword(password, stored) {
 export const tokenHash = (token) => createHash('sha256').update(token).digest('hex')
 
 export function cookieOptions() {
-  return { httpOnly: true, sameSite: 'strict', secure: String(process.env.APP_ORIGIN || '').startsWith('https://'), path: '/api', maxAge: SESSION_AGE_MS }
+  return { httpOnly: true, sameSite: 'strict', secure: String(process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL || '').startsWith('https://'), path: '/api', maxAge: SESSION_AGE_MS }
 }
 
 export async function createSession(pool, userId, response) {

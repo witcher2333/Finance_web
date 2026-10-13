@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { convertToCnyMinor, parseTransaction, fromMinor, rowToTransaction } from '../domain.js'
-import { hashPassword, verifyPassword, tokenHash } from '../security.js'
+import { cookieOptions, hashPassword, verifyPassword, tokenHash } from '../security.js'
 import { fetchFrankfurterRate, resolveRate } from '../fx.js'
 import { transactionsToCsv } from '../../src/finance.js'
 
@@ -32,6 +32,21 @@ test('password hashing uses a unique salt and rejects bad credentials', async ()
   assert.equal(await verifyPassword('wrong', a), false)
   assert.equal(await verifyPassword('anything', 'bad-hash'), false)
   assert.equal(tokenHash('abc').length, 64)
+})
+
+test('Render HTTPS origin enables secure session cookies', () => {
+  const previousAppOrigin = process.env.APP_ORIGIN
+  const previousRenderUrl = process.env.RENDER_EXTERNAL_URL
+  try {
+    delete process.env.APP_ORIGIN
+    process.env.RENDER_EXTERNAL_URL = 'https://tango-finance-studio.onrender.com'
+    assert.equal(cookieOptions().secure, true)
+  } finally {
+    if (previousAppOrigin === undefined) delete process.env.APP_ORIGIN
+    else process.env.APP_ORIGIN = previousAppOrigin
+    if (previousRenderUrl === undefined) delete process.env.RENDER_EXTERNAL_URL
+    else process.env.RENDER_EXTERNAL_URL = previousRenderUrl
+  }
 })
 
 test('uses the provider observation date for a historical weekend', async () => {
