@@ -1,6 +1,6 @@
 # Tango Finance Studio
 
-基于课程项目 [Tango Finance](https://github.com/Hu-Tianze/Tango-Finance) 的需求，独立重设计并实现的个人财务管理作品。原课程仓库在本地 `origin_resource/` 仅供功能对照，并被 Git 忽略；新版代码位于本仓库的 `src/` 和 `server/`。
+基于课程Internet Technology项目的需求，优化实现的个人财务管理作品。新版代码位于本仓库的 `src/` 和 `server/`。
 
 ## 功能
 
@@ -34,7 +34,7 @@ npm run migrate
 npm run dev:api
 ```
 
-再开一个终端运行 `npm run dev`，打开 `http://localhost:5173` 注册账户。`dev:api` 在 3001 端口运行，Vite 将 `/api` 代理到它。若你已有 PostgreSQL，可以不用 Docker，直接在 `.env` 中设置 `DATABASE_URL`。`.env.example` 中的密码只用于本地演示，不要用于公开部署。
+再开一个终端运行 `npm run dev`，打开 `http://localhost:5173` 注册账户。`dev:api` 在 3001 端口运行，Vite 将 `/api` 代理到它。若已有 PostgreSQL，可以不用 Docker，直接在 `.env` 中设置 `DATABASE_URL`。`.env.example` 中的密码只用于本地演示，不要用于公开部署。
 
 也可以直接运行 `docker compose up --build`，使用容器内的 PostgreSQL 和生产构建，在 `http://localhost:3001` 打开应用。
 
@@ -75,8 +75,6 @@ npm run build
 
 仓库根目录的 `render.yaml` 是以后在**新 Render 工作区**使用的 Blueprint 模板：它定义了数据库连接、`/api/ready` 健康检查，以及通过 GitHub CI 后自动部署。当前线上服务是单独创建的，未与这个 Blueprint 绑定；不要在现有工作区再次创建同名资源。当前服务已将 Render 健康检查路径设置为 `/api/ready`。应用读取 HTTPS `RENDER_EXTERNAL_URL` 作为默认请求来源并启用安全 Cookie；绑定自定义域名时，请在 Web 服务环境变量中设置 `APP_ORIGIN=https://你的域名`。
 
-**免费方案只适合短期演示。**Render 免费 Web 服务空闲约 15 分钟后会休眠，首次访问需要等待唤醒；本次免费 PostgreSQL 将于 **2026-11-12** 到期，到期后登录数据不可用。要长期放在简历中，请在到期前升级数据库并安排备份。
-
 - 存活检查：`GET /api/health`
 - 数据库就绪检查：`GET /api/ready`；部署平台可定期检查并在失败时告警
 - 服务日志为结构化 JSON，包含请求 ID、路径、状态和耗时，不记录请求体、密码或交易备注
@@ -95,11 +93,3 @@ server/migrations/   PostgreSQL 版本化建表脚本
 server/test/         单元测试及数据库集成测试
 .github/workflows/ci.yml  CI 流程
 ```
-
-## 简历表述建议
-
-在你能独立运行和解释实现后，可以写：
-
-> **Tango Finance Studio｜个人财务管理 Web 应用（独立复现与重设计）**：基于课程项目需求，使用 React、Express 和 PostgreSQL 重新实现账户、交易和预算管理；设计多币种历史汇率快照与异常回退流程，补充账户隔离、CSV 导出、自动化测试及容器化部署配置。
-
-面试时说明：原课程项目是团队成果，你当时承担辅助角色；上述新版由你按原需求独立复现和升级。正式部署、真实用户量或性能数据，只有实际完成后再加入简历。
