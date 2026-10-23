@@ -13,6 +13,7 @@ import {
   originalMoney, summarize, toCny, localDate, localMonth,
 } from './finance'
 import { api } from './api.js'
+import RecoveryCodes from './RecoveryCodes.jsx'
 
 const ICONS = {
   utensils: UtensilsCrossed, bag: ShoppingBag, car: CarFront,
@@ -109,10 +110,59 @@ function TransactionList({ transactions, onEdit, onDelete, compact = false }) {
   </div>)}</div>
 }
 
+function RecoveryCodesPanel() {
+  const [remaining, setRemaining] = useState(null)
+  const [password, setPassword] = useState('')
+  const [codes, setCodes] = useState(null)
+  const [saved, setSaved] = useState(false)
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    api.recoveryCodeStatus().then((result) => { if (active) setRemaining(result.remaining) }).catch((problem) => { if (active) setError(problem.message) })
+    return () => { active = false }
+  }, [])
+
+  async function regenerate(event) {
+    event.preventDefault()
+    setWorking(true)
+    setError('')
+    try {
+      const result = await api.regenerateRecoveryCodes(password)
+      setCodes(result.codes)
+      setRemaining(result.remaining)
+      setPassword('')
+      setSaved(false)
+    } catch (problem) {
+      setError(problem.message)
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  return <section className="panel settings-panel wide recovery-panel">
+    <h2>密码恢复码</h2>
+    <p>忘记密码时，可用注册邮箱和一个恢复码重设密码。{remaining === null ? '正在查询恢复码状态…' : `当前剩余 ${remaining} 个可用恢复码。`}</p>
+    {codes ? <>
+      <RecoveryCodes codes={codes} />
+      <label className="recovery-confirm"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> 我已将这组新恢复码保存到安全位置</label>
+      <button className="button primary" disabled={!saved} onClick={() => setCodes(null)}>完成</button>
+    </> : <form onSubmit={regenerate}>
+      <p>生成新恢复码会立即使旧恢复码失效。请先输入当前密码确认。</p>
+      <label className="field-label" htmlFor="recovery-password">当前密码</label>
+      <input id="recovery-password" className="form-control" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+      <button className="button secondary" type="submit" disabled={working}>{working ? '生成中…' : '生成新恢复码'}</button>
+    </form>}
+    {error && <p className="form-error" role="alert">{error}</p>}
+  </section>
+}
+
 function SettingsContent({ remote, account, onExport, onReset, onSignOut, onDeleteAccount }) {
   return <div className="settings-grid">
     <section className="panel settings-panel"><div className="settings-icon"><Download size={23} /></div><h2>导出交易数据</h2><p>将全部交易下载为 CSV 文件，包含每笔外币交易的折算汇率、汇率日期和来源。</p><button className="button primary" onClick={onExport}><Download size={17} /> 导出全部记录</button></section>
     {remote ? <section className="panel settings-panel"><div className="settings-icon mint"><Wallet size={23} /></div><h2>账户与数据</h2><p>已登录为 {account?.email}。交易和预算保存在 PostgreSQL 中，仅当前账户可读取。</p><button className="button secondary" onClick={onSignOut}>退出登录</button></section> : <section className="panel settings-panel"><div className="settings-icon mint"><Wallet size={23} /></div><h2>演示数据</h2><p>当前展示的数据仅保存在这个浏览器中。你可以随时恢复初始演示账本。</p><button className="button secondary" onClick={onReset}>恢复演示数据</button></section>}
+    {remote && <RecoveryCodesPanel />}
     <section className="panel settings-panel wide"><div className="settings-icon peach"><CircleHelp size={23} /></div><h2>关于这个作品</h2><p>{remote ? '登录版使用 PostgreSQL 保存账户、交易、预算和每笔外币交易的汇率快照。汇率服务不可用时，你可以手动录入汇率；数据可随时导出。' : '这是基于 Tango Finance 课程项目重新设计的独立前端演示。交易和预算保存在本地浏览器，多币种折算使用固定演示汇率。'}</p><div className="about-chips"><span>React</span><span>Vite</span><span>{remote ? 'PostgreSQL' : 'LocalStorage'}</span><span>响应式设计</span></div></section>
     {remote && <section className="panel settings-panel wide danger-panel"><h2>删除账户</h2><p>删除后，账户、交易、预算和登录会话会从数据库中移除。请先导出数据备份。</p><button className="button danger" onClick={onDeleteAccount}>删除账户和数据</button></section>}
   </div>

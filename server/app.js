@@ -8,6 +8,7 @@ import Decimal from 'decimal.js'
 import { EXPENSE_CATEGORIES, InputError, fromMinor, parseTransaction, rowToTransaction, toMinor, convertToCnyMinor } from './domain.js'
 import { clearSessionCookie, createSession, hashPassword, normalizeEmail, readSessionToken, tokenHash, validatePassword, verifyPassword } from './security.js'
 import { resolveRate } from './fx.js'
+import { generateRecoveryCodes, recoveryCodeHash, replaceRecoveryCodes } from './recovery.js'
 
 const DEFAULT_BUDGETS = { '餐饮美食': 1800, '购物消费': 1500, '交通出行': 800, '住房账单': 4500, '娱乐休闲': 1200, '学习成长': 800, '医疗健康': 500, '其他支出': 600 }
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -58,15 +59,17 @@ export function createApp({ pool, fetchImpl = fetch, origin = process.env.APP_OR
       if (!name || name.length > 50) throw new InputError('名字需要 1 至 50 个字符')
       const passwordHash = await hashPassword(password)
       const userId = randomUUID()
+      const recoveryCodes = generateRecoveryCodes()
       const client = await pool.connect()
       try {
         await client.query('BEGIN')
         await client.query('INSERT INTO users (id, email, name, password_hash) VALUES ($1,$2,$3,$4)', [userId, email, name, passwordHash])
         for (const [category, amount] of Object.entries(DEFAULT_BUDGETS)) await client.query('INSERT INTO budgets (user_id, category, amount_minor) VALUES ($1,$2,$3)', [userId, category, toMinor(amount)])
+        await replaceRecoveryCodes(client, userId, recoveryCodes)
         await client.query('COMMIT')
       } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
       await createSession(pool, userId, response)
-      response.status(201).json({ user: { id: userId, email, name } })
+      response.set('Cache-Control', 'no-store').status(201).json({ user: { id: userId, email, name }, recoveryCodes })
     } catch (error) { if (error.code === '23505') return next(new InputError('这个邮箱已经注册', 'EMAIL_EXISTS', 409)); next(error) }
   })
 
@@ -85,6 +88,51 @@ export function createApp({ pool, fetchImpl = fetch, origin = process.env.APP_OR
   app.get('/api/auth/me', requireAuth, (request, response) => response.json({ user: publicUser(request.user) }))
   app.post('/api/auth/logout', requireAuth, async (request, response, next) => {
     try { await pool.query('DELETE FROM sessions WHERE token_hash=$1', [request.sessionHash]); clearSessionCookie(response); response.status(204).end() } catch (error) { next(error) }
+  })
+
+  app.post('/api/auth/recover', authLimit, async (request, response, next) => {
+    try {
+      const email = normalizeEmail(request.body?.email)
+      const codeHash = recoveryCodeHash(request.body?.code)
+      const passwordHash = await hashPassword(validatePassword(request.body?.password))
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const result = await client.query('SELECT c.user_id FROM recovery_codes c JOIN users u ON u.id=c.user_id WHERE u.email=$1 AND c.code_hash=$2 FOR UPDATE OF c', [email, codeHash])
+        if (!result.rowCount) throw new InputError('邮箱或恢复码无效', 'INVALID_RECOVERY', 401)
+        const userId = result.rows[0].user_id
+        await client.query('UPDATE users SET password_hash=$1 WHERE id=$2', [passwordHash, userId])
+        await client.query('DELETE FROM recovery_codes WHERE user_id=$1 AND code_hash=$2', [userId, codeHash])
+        await client.query('DELETE FROM sessions WHERE user_id=$1', [userId])
+        await client.query('INSERT INTO audit_events (user_id, action) VALUES ($1,$2)', [userId, 'PASSWORD_RECOVERED'])
+        await client.query('COMMIT')
+      } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+      clearSessionCookie(response)
+      response.json({ ok: true })
+    } catch (error) { next(error) }
+  })
+
+  app.get('/api/account/recovery-codes', requireAuth, async (request, response, next) => {
+    try {
+      const result = await pool.query('SELECT count(*)::int AS remaining FROM recovery_codes WHERE user_id=$1', [request.user.id])
+      response.set('Cache-Control', 'no-store').json({ remaining: result.rows[0].remaining })
+    } catch (error) { next(error) }
+  })
+
+  app.post('/api/account/recovery-codes', requireAuth, authLimit, async (request, response, next) => {
+    try {
+      const result = await pool.query('SELECT password_hash FROM users WHERE id=$1', [request.user.id])
+      if (!(await verifyPassword(String(request.body?.password || ''), result.rows[0]?.password_hash))) throw new InputError('密码错误', 'INVALID_CREDENTIALS', 401)
+      const codes = generateRecoveryCodes()
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        await replaceRecoveryCodes(client, request.user.id, codes)
+        await client.query('INSERT INTO audit_events (user_id, action) VALUES ($1,$2)', [request.user.id, 'RECOVERY_CODES_REGENERATED'])
+        await client.query('COMMIT')
+      } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+      response.set('Cache-Control', 'no-store').json({ codes, remaining: codes.length })
+    } catch (error) { next(error) }
   })
 
   app.get('/api/transactions', requireAuth, async (request, response, next) => {
