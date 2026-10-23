@@ -28,7 +28,7 @@ export default function Root() {
     api.health().then(() => api.me().then((result) => {
       if (!cancelled) { setUser(result.user); setMode('account') }
     }).catch((error) => { if (!cancelled) setMode(error.status === 401 ? 'auth' : 'unavailable') }))
-      .catch(() => { if (!cancelled) setMode('demo') })
+      .catch(() => { if (!cancelled) setMode(import.meta.env.PROD ? 'unavailable' : 'demo') })
     return () => { cancelled = true }
   }, [])
   if (mode === 'checking') return <div className="boot-screen"><div className="boot-mark">T</div> 正在打开 Tango Finance…</div>
